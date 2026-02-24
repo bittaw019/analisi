@@ -1,9 +1,206 @@
 <!DOCTYPE html>
-<html>
+<html lang="it">
+
 <head>
-  <title>Test sito</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExcelData Analytics Dashboard</title>
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Librerie esterne da CDN -->
+    <!-- SheetJS per leggere i file Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Chart.js per i grafici -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Chart.js DataLabels plugin per le percentuali torta -->
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <!-- html2pdf per esportazione PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- Font e Icone -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body>
-  <h1>Ciao! Il mio sito è online 🎉</h1>
+
+    <!-- Overlay Caricamento Dati -->
+    <div id="loadingOverlay" class="hidden">
+        <div class="spinner"></div>
+        <h2 id="loadingText">Analisi del file in corso...</h2>
+        <p>Potrebbe richiedere qualche secondo per dataset molto grandi (200+ colonne)</p>
+    </div>
+
+    <!-- Schermata di Upload (Drag & Drop) -->
+    <div id="uploadScreen" class="upload-container">
+        <div class="upload-card">
+            <div class="logo-area">
+                <i class="fa-solid fa-chart-pie"></i>
+                <h1>Data Dashboard</h1>
+            </div>
+            <p class="subtitle">Analizza automaticamente i tuoi file Excel o CSV e genera grafici statistici interagendo
+                con i dati.</p>
+
+            <div id="dropZone" class="drop-zone">
+                <i class="fa-solid fa-cloud-arrow-up icon"></i>
+                <h3>Trascina qui il tuo file (.xlsx, .csv)</h3>
+                <p>oppure</p>
+                <button class="btn-primary" onclick="document.getElementById('fileInput').click()">Seleziona
+                    File</button>
+                <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden">
+            </div>
+
+            <div class="features-list">
+                <div class="feature"><i class="fa-solid fa-bolt"></i> Veloce (Tutto lato client)</div>
+                <div class="feature"><i class="fa-solid fa-chart-simple"></i> Classificazione Auto</div>
+                <div class="feature"><i class="fa-solid fa-diagram-project"></i> Analisi Incrociate</div>
+                <div class="feature"><i class="fa-solid fa-lock"></i> Privacy 100% (No Server)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Principale -->
+    <div id="dashboardScreen" class="dashboard-layout hidden">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fa-solid fa-chart-pie"></i>
+                <h2>Dashboard</h2>
+            </div>
+            <div class="sidebar-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="searchQuestions" placeholder="Cerca domanda...">
+            </div>
+            <div class="sidebar-nav">
+                <h3 class="nav-title">Variabili Analizzate (<span id="totalQuestionsBadge">0</span>)</h3>
+                <ul id="questionsList" class="questions-list">
+                    <!-- Popolato via JS -->
+                </ul>
+            </div>
+            <div class="sidebar-footer">
+                <button id="resetAppBtn" class="btn-secondary w-100"><i class="fa-solid fa-file-arrow-up"></i> Carica
+                    altro file</button>
+            </div>
+        </aside>
+
+        <!-- Area Principale -->
+        <main class="main-content" id="reportArea">
+            <!-- Header (Toolbar) -->
+            <header class="topbar">
+                <div class="topbar-title">
+                    <h2 id="projectName">Analisi Dataset</h2>
+                    <span class="badge badge-success">Dati caricati</span>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn-icon" id="downloadPdfBtn" title="Scarica Report in PDF">
+                        <i class="fa-solid fa-file-pdf"></i> Esporta PDF
+                    </button>
+                </div>
+            </header>
+
+            <!-- KPIs -->
+            <section class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-icon"><i class="fa-solid fa-users"></i></div>
+                    <div class="kpi-data">
+                        <h3>Totale Risposte</h3>
+                        <p id="kpiTotalRows">0</p>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon"><i class="fa-solid fa-list-ol"></i></div>
+                    <div class="kpi-data">
+                        <h3>Questioni Rilevate</h3>
+                        <p id="kpiTotalCols">0</p>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon"><i class="fa-solid fa-check-double"></i></div>
+                    <div class="kpi-data">
+                        <h3>Completamento (Celle non vuote)</h3>
+                        <p id="kpiCompletion">0%</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analisi Dinamica e Grafici -->
+            <section class="analysis-section">
+
+                <!-- Strumenti di Analisi e Filtri -->
+                <div class="analysis-controls">
+                    <div class="control-group">
+                        <label for="primaryVariable">Variabile Principale:</label>
+                        <select id="primaryVariable" class="form-control">
+                            <!-- Popolato via JS -->
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="crossVariable">Confronta con (Variabile Incrociata):</label>
+                        <select id="crossVariable" class="form-control">
+                            <option value="">-- Nessun incrocio (Analisi singola) --</option>
+                            <!-- Popolato via JS -->
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="chartTypeSelector">Tipo di Grafico:</label>
+                        <select id="chartTypeSelector" class="form-control">
+                            <option value="auto">Auto-detect</option>
+                            <option value="pie">Torta (Pie)</option>
+                            <option value="doughnut">Ciambella</option>
+                            <option value="bar">Barre Verticali</option>
+                            <option value="horizontalBar">Barre Orizzontali</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Contenitore del Grafico -->
+                <div class="chart-wrapper">
+                    <div class="chart-header">
+                        <h3 id="chartTitle">Seleziona una variabile</h3>
+                        <div>
+                            <span id="variableTypeBadge" class="badge badge-info">Tipo: Sconosciuto</span>
+                            <button id="downloadPngBtn" class="btn-icon-small" title="Scarica Grafico PNG"><i
+                                    class="fa-solid fa-download"></i> PNG</button>
+                        </div>
+                    </div>
+
+                    <!-- Canvas ChartJS -->
+                    <div class="canvas-container">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Tabella Dati / Dettagli Numerici -->
+                <div class="data-table-wrapper">
+                    <h3>Statistiche Dettagliate</h3>
+                    <div class="table-responsive">
+                        <table id="dataTable" class="modern-table">
+                            <thead>
+                                <tr id="tableHeader">
+                                    <th>Valore</th>
+                                    <th>Conteggio</th>
+                                    <th>Percentuale</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                                <!-- Popolato via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Script di configurazione per modificare parametri manualmente -->
+    <script src="config.js"></script>
+
+    <!-- Collegamento allo Script Principale -->
+    <script src="script.js"></script>
 </body>
+
 </html>

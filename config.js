@@ -6,5 +6,6 @@ const APP_CONFIG = {
 
     // Scegli quante domande mostrare al massimo
     // Scrivi 5 per vedere le prime 5, oppure un numero grandissimo (es. 9999) per farle vedere tutte quante.
-    maxQuestionsToShow: 6
+    maxQuestionsToShow: 10
 };
+
